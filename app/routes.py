@@ -18,7 +18,7 @@ def close_session(exc):
         db.close()
 
 @app.post("/reminders")
-def createReminder():
+def create_reminder():
     data = request.get_json(force=True)
     now = datetime.utcnow()
 
@@ -35,7 +35,7 @@ def createReminder():
     return {"id": row.id, "due_at": due_at.isoformat()}, 201
 
 @app.get("/reminders/<int:rid>")
-def getReminder(rid: int):
+def get_reminder(rid: int):
     print(f"************ rid: {rid}")
     row = g.db.get(Reminder, rid)
     if not row:
