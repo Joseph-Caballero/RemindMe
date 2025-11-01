@@ -49,6 +49,62 @@ def getReminder(rid: int):
         "updated_at": row.updated_at.isoformat() if row.updated_at else None
     }, 200
 
+@app.get("/reminders/all")
+def get_all_reminders():
+    reminders = g.db.query(Reminder).order_by(Reminder.due_at.desc()).all()
+
+    if len(reminders) == 0:
+        return {"error": "You currently have no reminders"}
+
+    response = []
+
+    for reminder in reminders:
+        response.append({
+            "id": reminder.id,
+            "title": reminder.title,
+            "due_at": reminder.due_at.isoformat() if reminder.due_at else None,
+            "sent": reminder.sent
+        })
+    
+    return response, 200
+
+@app.patch("/reminders/<int:rid>")
+def update_reminder(rid: int):
+    data = request.get_json(force=True)
+    r = g.db.get(Reminder, rid)
+    if not r:
+        return {"error": "not found"}, 404
+
+    due_at_changed = False
+
+    if "title" in data:
+        r.title = data["title"]
+
+    if "due_at" in data:
+        old_due_at = r.due_at
+
+        try:
+            new_due_at = datetime.fromisoformat(data["due_at"])
+        except ValueError:
+            return {"error": "invalid due_at format"}, 400
+
+        if new_due_at != old_due_at:
+            r.due_at = new_due_at
+            due_at_changed = True
+
+    g.db.commit()
+
+    return {"ok": True, "due_at_changed": due_at_changed}, 200
+
+@app.delete("/reminder/<int:rid>")
+def delete_reminder(rid: int):
+    r = g.db.get(Reminder, rid)
+    if not r:
+        return {"error": "not found"}, 404
+    
+    g.db.delete(r)
+    g.db.commit()
+    return {"ok": True, "deleted_id": rid}, 200
 
 @app.route("/health")
 def health():
