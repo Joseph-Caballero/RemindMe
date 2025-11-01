@@ -1,6 +1,6 @@
 from flask import Flask, g, request
-from db import SessionLocal, init_db
-from models import Reminder
+from app.db import SessionLocal, init_db
+from app.models import Reminder
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -17,7 +17,7 @@ def close_session(exc):
     if db is not None:
         db.close()
 
-@app.post("/reminders")
+@app.post("/reminder")
 def create_reminder():
     data = request.get_json(force=True)
     now = datetime.utcnow()

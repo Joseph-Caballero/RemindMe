@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import String, DateTime, Boolean, func, Index
 from sqlalchemy.orm import Mapped, mapped_column
-from db import Base
+from app.db import Base
 
 class Reminder(Base):
     __tablename__ = "reminders" 

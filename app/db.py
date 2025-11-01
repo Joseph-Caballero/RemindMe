@@ -16,5 +16,5 @@ SessionLocal = sessionmaker(
 )
 
 def init_db():
-    from models import Reminder
+    from app.models import Reminder
     Base.metadata.create_all(bind = engine)
