@@ -3,6 +3,9 @@ from app.db import SessionLocal, init_db
 from app.models import Reminder
 from app.tasks import mark_reminder_sent
 from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
