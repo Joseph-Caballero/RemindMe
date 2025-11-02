@@ -21,6 +21,9 @@ def close_session(exc):
     if db is not None:
         db.close()
 
+@app.route('/')
+def homepage():
+    return render_template('index.html')
 
 @app.post("/reminder")
 def create_reminder():
