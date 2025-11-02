@@ -1,7 +1,8 @@
 from flask import Flask, g, request
 from app.db import SessionLocal, init_db
 from app.models import Reminder
-from datetime import datetime, timedelta
+from app.tasks import mark_reminder_sent
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 
@@ -20,17 +21,24 @@ def close_session(exc):
 @app.post("/reminder")
 def create_reminder():
     data = request.get_json(force=True)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc) 
 
     if "due_in" in data:
         due_at = now + timedelta(minutes=int(data["due_in"]))
     else:
         due_at = datetime.fromisoformat(data["due_at"])
+        if due_at.tzinfo is None:
+            due_at = due_at.replace(tzinfo=timezone.utc)
     
     row = Reminder(title = data["title"], due_at = due_at)
     g.db.add(row)
     g.db.commit()
     g.db.refresh(row)
+
+    if due_at <= now:
+        mark_reminder_sent.apply_async(args=[row.id])
+    else:
+        mark_reminder_sent.apply_async(args=[row.id], eta=due_at)
 
     return {"id": row.id, "due_at": due_at.isoformat()}, 201
 
