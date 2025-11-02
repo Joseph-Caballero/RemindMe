@@ -1,4 +1,4 @@
-from flask import Flask, g, request
+from flask import Flask, g, render_template, request
 from app.db import SessionLocal, init_db
 from app.models import Reminder
 from app.tasks import mark_reminder_sent
@@ -21,6 +21,7 @@ def close_session(exc):
     if db is not None:
         db.close()
 
+
 @app.post("/reminder")
 def create_reminder():
     data = request.get_json(force=True)
@@ -33,7 +34,7 @@ def create_reminder():
         if due_at.tzinfo is None:
             due_at = due_at.replace(tzinfo=timezone.utc)
     
-    row = Reminder(title = data["title"], due_at = due_at)
+    row = Reminder(title = data["title"], email = data["email"], due_at = due_at)
     g.db.add(row)
     g.db.commit()
     g.db.refresh(row)
@@ -54,6 +55,7 @@ def get_reminder(rid: int):
     return {
         "id": row.id,
         "title": row.title,
+        "email": row.email,
         "due_at": row.due_at.isoformat(),
         "sent": row.sent,
         "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -73,6 +75,7 @@ def get_all_reminders():
         response.append({
             "id": reminder.id,
             "title": reminder.title,
+            "email": reminder.email,
             "due_at": reminder.due_at.isoformat() if reminder.due_at else None,
             "sent": reminder.sent
         })
