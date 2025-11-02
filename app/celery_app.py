@@ -1,12 +1,15 @@
 from celery import Celery
 import os
+from dotenv import load_dotenv
 
-redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+load_dotenv()
+
+redis_url = os.getenv("REDIS_URL")
 
 celery_app = Celery(
     "remindme", 
-    broker=f"{redis_url}", 
-    backend=f"{redis_url}"  
+    broker=redis_url, 
+    backend=None
 )
 
 celery_app.conf.update(
@@ -15,6 +18,7 @@ celery_app.conf.update(
     result_serializer='json',
     timezone='UTC',
     enable_utc=True,
+    task_ignore_result=True
 )
 
 from app import tasks
