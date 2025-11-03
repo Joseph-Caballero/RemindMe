@@ -30,12 +30,10 @@ def create_reminder():
     data = request.get_json(force=True)
     now = datetime.now(timezone.utc) 
 
-    if "due_in" in data:
-        due_at = now + timedelta(minutes=int(data["due_in"]))
-    else:
-        due_at = datetime.fromisoformat(data["due_at"])
-        if due_at.tzinfo is None:
-            due_at = due_at.replace(tzinfo=timezone.utc)
+    due_in_minutes = int(data["due_in"])
+    if due_in_minutes not in [1, 3, 5]:
+        return {"error": "due_in must be 1, 3, or 5 minutes"}, 400
+    due_at = now + timedelta(minutes=due_in_minutes)
     
     row = Reminder(title = data["title"], email = data["email"], due_at = due_at)
     g.db.add(row)
@@ -48,80 +46,6 @@ def create_reminder():
         mark_reminder_sent.apply_async(args=[row.id], eta=due_at)
 
     return {"id": row.id, "due_at": due_at.isoformat()}, 201
-
-@app.get("/reminders/<int:rid>")
-def get_reminder(rid: int):
-    print(f"************ rid: {rid}")
-    row = g.db.get(Reminder, rid)
-    if not row:
-        return {"error": "not found"}, 404
-    return {
-        "id": row.id,
-        "title": row.title,
-        "email": row.email,
-        "due_at": row.due_at.isoformat(),
-        "sent": row.sent,
-        "created_at": row.created_at.isoformat() if row.created_at else None,
-        "updated_at": row.updated_at.isoformat() if row.updated_at else None
-    }, 200
-
-@app.get("/reminders/all")
-def get_all_reminders():
-    reminders = g.db.query(Reminder).order_by(Reminder.due_at.desc()).all()
-
-    if len(reminders) == 0:
-        return {"error": "You currently have no reminders"}
-
-    response = []
-
-    for reminder in reminders:
-        response.append({
-            "id": reminder.id,
-            "title": reminder.title,
-            "email": reminder.email,
-            "due_at": reminder.due_at.isoformat() if reminder.due_at else None,
-            "sent": reminder.sent
-        })
-    
-    return response, 200
-
-@app.patch("/reminders/<int:rid>")
-def update_reminder(rid: int):
-    data = request.get_json(force=True)
-    r = g.db.get(Reminder, rid)
-    if not r:
-        return {"error": "not found"}, 404
-
-    due_at_changed = False
-
-    if "title" in data:
-        r.title = data["title"]
-
-    if "due_at" in data:
-        old_due_at = r.due_at
-
-        try:
-            new_due_at = datetime.fromisoformat(data["due_at"])
-        except ValueError:
-            return {"error": "invalid due_at format"}, 400
-
-        if new_due_at != old_due_at:
-            r.due_at = new_due_at
-            due_at_changed = True
-
-    g.db.commit()
-
-    return {"ok": True, "due_at_changed": due_at_changed}, 200
-
-@app.delete("/reminder/<int:rid>")
-def delete_reminder(rid: int):
-    r = g.db.get(Reminder, rid)
-    if not r:
-        return {"error": "not found"}, 404
-    
-    g.db.delete(r)
-    g.db.commit()
-    return {"ok": True, "deleted_id": rid}, 200
 
 @app.route("/health")
 def health():
