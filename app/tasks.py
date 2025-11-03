@@ -1,4 +1,3 @@
-from app.celery_app import celery_app
 from app.db import SessionLocal
 from app.models import Reminder
 import os
@@ -10,7 +9,7 @@ load_dotenv()
 def send_reminder_email(reminder: Reminder):
     mailgun_api_key = os.getenv("MAILGUN_API_KEY")
     mailgun_domain = os.getenv("MAILGUN_DOMAIN")
-    from_email = f"RemindMe <postmaster@{mailgun_domain}>"
+    from_email = f"RemindMeSoon <postmaster@{mailgun_domain}>"
     
     if not mailgun_api_key:
         raise ValueError("MAILGUN_API_KEY environment variable is not set")
@@ -20,6 +19,18 @@ def send_reminder_email(reminder: Reminder):
     
     url = f"https://api.mailgun.net/v3/{mailgun_domain}/messages"
     
+    # Create a fun email template
+    email_text = f"""
+    🎉 Reminder Alert! 🎉
+
+    Hey there! This is your friendly reminder:
+
+    ✨ {reminder.title} ✨
+
+    ---
+    Sent by RemindMeSoon
+    """
+    
     response = requests.post(
         url,
         auth=("api", mailgun_api_key),
@@ -27,7 +38,7 @@ def send_reminder_email(reminder: Reminder):
             "from": from_email,
             "to": reminder.email,
             "subject": f"Reminder: {reminder.title}",
-            "text": reminder.title
+            "text": email_text.strip()
         }
     )
     
@@ -36,8 +47,7 @@ def send_reminder_email(reminder: Reminder):
     
     return response.json()
 
-@celery_app.task(name="mark_reminder_sent")
-def mark_reminder_sent(reminder_id: int):
+def process_reminder(reminder_id: int):
     db = SessionLocal()
     try:
         reminder = db.get(Reminder, reminder_id)
@@ -46,11 +56,15 @@ def mark_reminder_sent(reminder_id: int):
             print(f"Reminder {reminder_id} not found")
             return {"status": "error", "message": "Reminder not found"}
         
+        if reminder.sent:
+            print(f"Reminder {reminder_id} already sent, skipping")
+            return {"status": "skipped", "reminder_id": reminder_id}
+        
         try:
             send_reminder_email(reminder)
             print(f"Email sent successfully for reminder {reminder_id} to {reminder.email}")
         except Exception as e:
-            print(f"Error sending email for reminder {reminder_id}: {e}")
+            raise Exception(f"Error sending email for reminder {reminder_id}: {e}")
         
         reminder.sent = True
         db.commit()
@@ -63,3 +77,13 @@ def mark_reminder_sent(reminder_id: int):
         return {"status": "error", "message": str(e)}
     finally:
         db.close()
+
+try:
+    from app.celery_app import celery_app
+    
+    if celery_app is not None:
+        @celery_app.task(name="mark_reminder_sent")
+        def mark_reminder_sent(reminder_id: int):
+            return process_reminder(reminder_id)
+except (ImportError, AttributeError):
+    pass
